@@ -11,9 +11,8 @@ export async function GET() {
       status,
       priority_score,
       created_at,
-      users:users(id, name, email),
-      report_categories:report_categories(id, name),
-      report_images(id, image_url)
+      user_id,
+      category_id
     `)
     .order('created_at', { ascending: false })
 
