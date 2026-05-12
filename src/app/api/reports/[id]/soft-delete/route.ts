@@ -3,8 +3,9 @@ import { supabaseAdmin } from '../../../../../lib/supabase/admin'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
 
   const { error } =
     await supabaseAdmin
@@ -13,7 +14,7 @@ export async function PATCH(
         deleted_at: new Date(),
       })
       .is('deleted_at', null)
-      .eq('id', params.id)
+      .eq('id', id)
 
   if (error) {
     return NextResponse.json(

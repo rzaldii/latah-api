@@ -3,8 +3,9 @@ import { supabaseAdmin } from '../../../../lib/supabase/admin'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
 
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -15,7 +16,7 @@ export async function GET(
       role,
       created_at
     `)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error) {

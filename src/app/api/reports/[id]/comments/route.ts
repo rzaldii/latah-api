@@ -3,8 +3,9 @@ import { supabaseAdmin } from '../../../../../lib/supabase/admin'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
 
   const { data, error } = await supabaseAdmin
     .from('comments')
@@ -18,7 +19,7 @@ export async function GET(
         name
       )
     `)
-    .eq('report_id', params.id)
+    .eq('report_id', id)
     .order('created_at', { ascending: false })
 
   if (error) {

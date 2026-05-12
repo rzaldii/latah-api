@@ -3,8 +3,9 @@ import { supabaseAdmin } from '../../../../../lib/supabase/admin'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
 
   const body = await request.json()
 
@@ -18,7 +19,7 @@ export async function PATCH(
     .from('reports')
     .select('*')
     .is('deleted_at', null)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!report) {
@@ -37,13 +38,13 @@ export async function PATCH(
         status: new_status,
     })
     .is('deleted_at', null)
-    .eq('id', params.id)
+    .eq('id', id)
 
   await supabaseAdmin
     .from('report_status_histories')
     .insert([
       {
-        report_id: params.id,
+        report_id: id,
         old_status: report.status,
         new_status,
         changed_by,

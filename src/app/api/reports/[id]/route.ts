@@ -3,8 +3,9 @@ import { supabaseAdmin } from '../../../../lib/supabase/admin'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params
 
   const { data, error } = await supabaseAdmin
     .from('reports')
@@ -44,7 +45,7 @@ export async function GET(
       )
     `)
     .is('deleted_at', null)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error) {
@@ -62,14 +63,15 @@ export async function GET(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
 
   const { error } = await supabaseAdmin
     .from('reports')
     .delete()
     .is('deleted_at', null)
-    .eq('id', params.id)
+    .eq('id', id)
 
   if (error) {
     return NextResponse.json(
