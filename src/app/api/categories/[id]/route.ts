@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase/admin'
+import { supabaseAdmin } from '../../../../lib/supabase/admin'
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
 
   const { data, error } = await supabaseAdmin
     .from('report_categories')
     .select('*')
-    .order('id', { ascending: true })
+    .eq('id', params.id)
+    .single()
 
   if (error) {
     return NextResponse.json(
       { success: false, message: error.message },
-      { status: 500 }
+      { status: 404 }
     )
   }
 

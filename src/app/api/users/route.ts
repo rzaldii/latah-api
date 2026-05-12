@@ -4,13 +4,22 @@ import { supabaseAdmin } from '../../../lib/supabase/admin'
 export async function GET() {
 
   const { data, error } = await supabaseAdmin
-    .from('report_categories')
-    .select('*')
-    .order('id', { ascending: true })
+    .from('users')
+    .select(`
+      id,
+      name,
+      email,
+      role,
+      created_at
+    `)
+    .order('created_at', { ascending: false })
 
   if (error) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      {
+        success: false,
+        message: error.message,
+      },
       { status: 500 }
     )
   }

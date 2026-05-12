@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase/admin'
+import { supabaseAdmin } from '../../../../../lib/supabase/admin'
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
 
   const { data, error } = await supabaseAdmin
-    .from('report_categories')
+    .from('votes')
     .select('*')
-    .order('id', { ascending: true })
+    .eq('report_id', params.id)
 
   if (error) {
     return NextResponse.json(
@@ -17,6 +20,7 @@ export async function GET() {
 
   return NextResponse.json({
     success: true,
+    total_votes: data.length,
     data,
   })
 }

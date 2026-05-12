@@ -25,6 +25,7 @@ export async function PATCH(request: Request) {
     .from('reports')
     .select('id, status')
     .eq('id', report_id)
+    .is('deleted_at', null)
     .single()
 
   if (currentError) {
@@ -43,6 +44,7 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', report_id)
+    .is('deleted_at', null)
     .select()
     .single()
 

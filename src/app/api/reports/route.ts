@@ -1,23 +1,57 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase/admin'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
 
-  console.log('SUPABASE URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+  const searchParams = request.nextUrl.searchParams
 
-  const { data, error } = await supabaseAdmin
+  const status = searchParams.get('status')
+  const category = searchParams.get('category')
+  const search = searchParams.get('search')
+
+  let query = supabaseAdmin
     .from('reports')
     .select(`
       id,
       title,
       description,
+      location_name,
       status,
       priority_score,
       created_at,
-      user_id,
-      category_id
+
+      users (
+        id,
+        name
+      ),
+
+      report_categories (
+        id,
+        name,
+        icon
+      ),
+
+      report_images (
+        id,
+        image_url
+      )
     `)
     .order('created_at', { ascending: false })
+    .is('deleted_at', null)
+
+  if (status) {
+    query = query.eq('status', status)
+  }
+
+  if (category) {
+    query = query.eq('category_id', category)
+  }
+
+  if (search) {
+    query = query.ilike('title', `%${search}%`)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     return NextResponse.json(
@@ -26,13 +60,27 @@ export async function GET() {
     )
   }
 
-  return NextResponse.json({ success: true, data })
+  return NextResponse.json({
+    success: true,
+    total: data.length,
+    data,
+  })
 }
 
 export async function POST(request: Request) {
+
   const body = await request.json()
 
-  const { user_id, category_id, title, description, location_name, address_detail, latitude, longitude } = body
+  const {
+    user_id,
+    category_id,
+    title,
+    description,
+    location_name,
+    address_detail,
+    latitude,
+    longitude,
+  } = body
 
   const { data, error } = await supabaseAdmin
     .from('reports')
@@ -47,15 +95,26 @@ export async function POST(request: Request) {
         latitude,
         longitude,
         status: 'pending',
-        priority_score: 0,
+        priority_score: Math.floor(Math.random() * 100),
       },
     ])
+    .is('deleted_at', null)
     .select()
     .single()
 
   if (error) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 400 }
+    )
   }
 
-  return NextResponse.json({ success: true, data }, { status: 201 })
+  return NextResponse.json(
+    {
+      success: true,
+      message: 'Report created successfully',
+      data,
+    },
+    { status: 201 }
+  )
 }
