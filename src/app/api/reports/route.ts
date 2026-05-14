@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
-
   const searchParams = request.nextUrl.searchParams
 
   const status = searchParams.get('status')
@@ -62,59 +61,131 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    total: data.length,
+    total: data?.length ?? 0,
     data,
   })
 }
 
 export async function POST(request: Request) {
+  try {
+    const body = await request.json()
 
-  const body = await request.json()
+    const {
+      user_id,
+      category_id,
+      title,
+      description,
+      location_name,
+      address_detail,
+      latitude,
+      longitude,
+      image_url,
+    } = body
 
-  const {
-    user_id,
-    category_id,
-    title,
-    description,
-    location_name,
-    address_detail,
-    latitude,
-    longitude,
-  } = body
+    const { data: report, error } = await supabaseAdmin
+      .from('reports')
+      .insert([
+        {
+          user_id,
+          category_id,
+          title,
+          description,
+          location_name,
+          address_detail,
+          latitude,
+          longitude,
+          status: 'pending',
+          priority_score: Math.floor(Math.random() * 100),
+        },
+      ])
+      .select()
+      .single()
 
-  const { data, error } = await supabaseAdmin
-    .from('reports')
-    .insert([
-      {
-        user_id,
-        category_id,
+    if (error) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 400 }
+      )
+    }
+
+    if (image_url) {
+      const { error: imageError } = await supabaseAdmin
+        .from('report_images')
+        .insert([
+          {
+            report_id: report.id,
+            image_url,
+          },
+        ])
+
+      if (imageError) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Report created, but image failed to save: ${imageError.message}`,
+            data: report,
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    const { data: fullReport, error: fullReportError } = await supabaseAdmin
+      .from('reports')
+      .select(`
+        id,
         title,
         description,
         location_name,
-        address_detail,
-        latitude,
-        longitude,
-        status: 'pending',
-        priority_score: Math.floor(Math.random() * 100),
-      },
-    ])
-    .is('deleted_at', null)
-    .select()
-    .single()
+        status,
+        priority_score,
+        created_at,
 
-  if (error) {
+        users (
+          id,
+          name
+        ),
+
+        report_categories (
+          id,
+          name,
+          icon
+        ),
+
+        report_images (
+          id,
+          image_url
+        )
+      `)
+      .eq('id', report.id)
+      .single()
+
+    if (fullReportError) {
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Report created successfully',
+          data: report,
+        },
+        { status: 201 }
+      )
+    }
+
     return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 400 }
+      {
+        success: true,
+        message: 'Report created successfully',
+        data: fullReport,
+      },
+      { status: 201 }
+    )
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || 'Failed to create report',
+      },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json(
-    {
-      success: true,
-      message: 'Report created successfully',
-      data,
-    },
-    { status: 201 }
-  )
 }
