@@ -1,70 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase/admin'
-
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-
-  const status = searchParams.get('status')
-  const category = searchParams.get('category')
-  const search = searchParams.get('search')
-
-  let query = supabaseAdmin
-    .from('reports')
-    .select(`
-      id,
-      title,
-      description,
-      location_name,
-      status,
-      priority_score,
-      created_at,
-
-      users (
-        id,
-        name
-      ),
-
-      report_categories (
-        id,
-        name,
-        icon
-      ),
-
-      report_images (
-        id,
-        image_url
-      )
-    `)
-    .order('created_at', { ascending: false })
-    .is('deleted_at', null)
-
-  if (status) {
-    query = query.eq('status', status)
-  }
-
-  if (category) {
-    query = query.eq('category_id', category)
-  }
-
-  if (search) {
-    query = query.ilike('title', `%${search}%`)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 }
-    )
-  }
-
-  return NextResponse.json({
-    success: true,
-    total: data?.length ?? 0,
-    data,
-  })
-}
 
 export async function POST(request: Request) {
   try {
@@ -72,118 +7,190 @@ export async function POST(request: Request) {
 
     const {
       user_id,
-      category_id,
-      title,
-      description,
-      location_name,
-      address_detail,
-      latitude,
-      longitude,
-      image_url,
+      report_id,
     } = body
 
-    const { data: report, error } = await supabaseAdmin
-      .from('reports')
-      .insert([
-        {
-          user_id,
-          category_id,
-          title,
-          description,
-          location_name,
-          address_detail,
-          latitude,
-          longitude,
-          status: 'pending',
-          priority_score: Math.floor(Math.random() * 100),
-        },
-      ])
-      .select()
-      .single()
-
-    if (error) {
+    if (!user_id || !report_id) {
       return NextResponse.json(
-        { success: false, message: error.message },
+        {
+          success: false,
+          message: 'user_id and report_id are required',
+        },
         { status: 400 }
       )
     }
 
-    if (image_url) {
-      const { error: imageError } = await supabaseAdmin
-        .from('report_images')
-        .insert([
-          {
-            report_id: report.id,
-            image_url,
-          },
-        ])
-
-      if (imageError) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Report created, but image failed to save: ${imageError.message}`,
-            data: report,
-          },
-          { status: 500 }
-        )
-      }
-    }
-
-    const { data: fullReport, error: fullReportError } = await supabaseAdmin
-      .from('reports')
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .insert([
+        {
+          user_id: Number(user_id),
+          report_id: Number(report_id),
+        },
+      ])
       .select(`
         id,
-        title,
-        description,
-        location_name,
-        status,
-        priority_score,
+        user_id,
+        report_id,
         created_at,
 
-        users (
+        reports (
           id,
-          name
-        ),
+          title,
+          description,
+          location_name,
+          status,
+          priority_score,
+          created_at,
 
-        report_categories (
-          id,
-          name,
-          icon
-        ),
+          users (
+            id,
+            name
+          ),
 
-        report_images (
-          id,
-          image_url
+          report_categories (
+            id,
+            name,
+            icon
+          ),
+
+          report_images (
+            id,
+            image_url
+          ),
+
+          comments (
+            id
+          ),
+
+          votes (
+            id,
+            vote_type
+          )
         )
       `)
-      .eq('id', report.id)
       .single()
 
-    if (fullReportError) {
+    if (error) {
       return NextResponse.json(
         {
-          success: true,
-          message: 'Report created successfully',
-          data: report,
+          success: false,
+          message: error.message,
         },
-        { status: 201 }
+        { status: 400 }
       )
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Report created successfully',
-        data: fullReport,
-      },
-      { status: 201 }
-    )
+    return NextResponse.json({
+      success: true,
+      data,
+    })
   } catch (error: any) {
     return NextResponse.json(
       {
         success: false,
-        message: error.message || 'Failed to create report',
+        message: error.message || 'Failed to create bookmark',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+
+    const userId = searchParams.get('user_id')
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'user_id is required',
+          data: [],
+        },
+        { status: 400 }
+      )
+    }
+
+    const numericUserId = Number(userId)
+
+    if (!Number.isFinite(numericUserId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'user_id must be a valid number',
+          data: [],
+        },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select(`
+        id,
+        user_id,
+        report_id,
+        created_at,
+
+        reports (
+          id,
+          title,
+          description,
+          location_name,
+          status,
+          priority_score,
+          created_at,
+
+          users (
+            id,
+            name
+          ),
+
+          report_categories (
+            id,
+            name,
+            icon
+          ),
+
+          report_images (
+            id,
+            image_url
+          ),
+
+          comments (
+            id
+          ),
+
+          votes (
+            id,
+            vote_type
+          )
+        )
+      `)
+      .eq('user_id', numericUserId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message,
+        },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: data ?? [],
+    })
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || 'Failed to get bookmarks',
       },
       { status: 500 }
     )
