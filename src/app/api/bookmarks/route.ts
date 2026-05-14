@@ -1,78 +1,191 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase/admin'
 
-export async function POST(request: Request) {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
 
-  const body = await request.json()
+  const status = searchParams.get('status')
+  const category = searchParams.get('category')
+  const search = searchParams.get('search')
 
-  const {
-    user_id,
-    report_id,
-  } = body
+  let query = supabaseAdmin
+    .from('reports')
+    .select(`
+      id,
+      title,
+      description,
+      location_name,
+      status,
+      priority_score,
+      created_at,
 
-  const { data, error } =
-    await supabaseAdmin
-      .from('bookmarks')
-      .insert([
-        {
-          user_id,
-          report_id,
-        },
-      ])
-      .select()
-      .single()
+      users (
+        id,
+        name
+      ),
 
-  if (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message,
-      },
-      { status: 400 }
-    )
+      report_categories (
+        id,
+        name,
+        icon
+      ),
+
+      report_images (
+        id,
+        image_url
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .is('deleted_at', null)
+
+  if (status) {
+    query = query.eq('status', status)
   }
 
-  return NextResponse.json({
-    success: true,
-    data,
-  })
-}
+  if (category) {
+    query = query.eq('category_id', category)
+  }
 
-export async function GET(request: Request) {
+  if (search) {
+    query = query.ilike('title', `%${search}%`)
+  }
 
-  const { searchParams } =
-    new URL(request.url)
-
-  const userId =
-    searchParams.get('user_id')
-
-  const { data, error } =
-    await supabaseAdmin
-      .from('bookmarks')
-      .select(`
-        id,
-
-        reports (
-          id,
-          title,
-          status,
-          priority_score
-        )
-      `)
-      .eq('user_id', userId)
+  const { data, error } = await query
 
   if (error) {
     return NextResponse.json(
-      {
-        success: false,
-        message: error.message,
-      },
+      { success: false, message: error.message },
       { status: 500 }
     )
   }
 
   return NextResponse.json({
     success: true,
+    total: data?.length ?? 0,
     data,
   })
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+
+    const {
+      user_id,
+      category_id,
+      title,
+      description,
+      location_name,
+      address_detail,
+      latitude,
+      longitude,
+      image_url,
+    } = body
+
+    const { data: report, error } = await supabaseAdmin
+      .from('reports')
+      .insert([
+        {
+          user_id,
+          category_id,
+          title,
+          description,
+          location_name,
+          address_detail,
+          latitude,
+          longitude,
+          status: 'pending',
+          priority_score: Math.floor(Math.random() * 100),
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 400 }
+      )
+    }
+
+    if (image_url) {
+      const { error: imageError } = await supabaseAdmin
+        .from('report_images')
+        .insert([
+          {
+            report_id: report.id,
+            image_url,
+          },
+        ])
+
+      if (imageError) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Report created, but image failed to save: ${imageError.message}`,
+            data: report,
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    const { data: fullReport, error: fullReportError } = await supabaseAdmin
+      .from('reports')
+      .select(`
+        id,
+        title,
+        description,
+        location_name,
+        status,
+        priority_score,
+        created_at,
+
+        users (
+          id,
+          name
+        ),
+
+        report_categories (
+          id,
+          name,
+          icon
+        ),
+
+        report_images (
+          id,
+          image_url
+        )
+      `)
+      .eq('id', report.id)
+      .single()
+
+    if (fullReportError) {
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Report created successfully',
+          data: report,
+        },
+        { status: 201 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Report created successfully',
+        data: fullReport,
+      },
+      { status: 201 }
+    )
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || 'Failed to create report',
+      },
+      { status: 500 }
+    )
+  }
 }

@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
       title,
       description,
       location_name,
+      address_detail,
+      latitude,
+      longitude,
       status,
       priority_score,
       created_at,
@@ -33,6 +36,15 @@ export async function GET(request: NextRequest) {
       report_images (
         id,
         image_url
+      ),
+
+      comments (
+        id
+      ),
+
+      votes (
+        id,
+        vote_type
       )
     `)
     .order('created_at', { ascending: false })
@@ -81,6 +93,16 @@ export async function POST(request: Request) {
       longitude,
       image_url,
     } = body
+
+    if (!user_id || !category_id || !title || !description || !location_name) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Required report data is incomplete',
+        },
+        { status: 400 }
+      )
+    }
 
     const { data: report, error } = await supabaseAdmin
       .from('reports')
@@ -137,6 +159,9 @@ export async function POST(request: Request) {
         title,
         description,
         location_name,
+        address_detail,
+        latitude,
+        longitude,
         status,
         priority_score,
         created_at,
@@ -155,6 +180,15 @@ export async function POST(request: Request) {
         report_images (
           id,
           image_url
+        ),
+
+        comments (
+          id
+        ),
+
+        votes (
+          id,
+          vote_type
         )
       `)
       .eq('id', report.id)
