@@ -35,6 +35,8 @@ export async function GET(request: Request) {
       .select(`
         id,
         user_id,
+        report_id,
+        report_status,
         title,
         message,
         is_read,

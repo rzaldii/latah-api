@@ -180,15 +180,18 @@ export async function PATCH(
 
     if (existingReport.user_id && existingReport.status !== nextStatus) {
       const { error: notificationError } = await supabaseAdmin
-        .from('notifications')
-        .insert([
-          {
-            user_id: existingReport.user_id,
-            title: 'Status laporan diperbarui',
-            message: `Laporan "${existingReport.title}" berubah status menjadi ${getStatusLabel(nextStatus)}.`,
-            is_read: false,
-          },
-        ])
+      .from('notifications')
+      .insert([
+        {
+          user_id: existingReport.user_id,
+          report_id: existingReport.id,
+          report_status: nextStatus,
+          title: 'Status laporan diperbarui',
+          message: `Laporan "${existingReport.title}" berubah status menjadi ${getStatusLabel(nextStatus)}.`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        },
+      ])
 
       if (notificationError) {
         console.error('CREATE NOTIFICATION ERROR:', notificationError.message)
