@@ -61,6 +61,18 @@ export async function GET(
   })
 }
 
+function getStatusLabel(status: string) {
+  const statusMap: Record<string, string> = {
+    pending: 'Pending',
+    verified: 'Terverifikasi',
+    processing: 'Diproses',
+    resolved: 'Selesai',
+    rejected: 'Ditolak',
+  }
+
+  return statusMap[status] || status
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -86,6 +98,29 @@ export async function PATCH(
           message: 'Invalid report status',
         },
         { status: 400 }
+      )
+    }
+
+    const { data: existingReport, error: existingReportError } =
+      await supabaseAdmin
+        .from('reports')
+        .select(`
+          id,
+          title,
+          user_id,
+          status
+        `)
+        .eq('id', id)
+        .is('deleted_at', null)
+        .single()
+
+    if (existingReportError) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: existingReportError.message,
+        },
+        { status: 404 }
       )
     }
 
@@ -141,6 +176,23 @@ export async function PATCH(
         },
         { status: 500 }
       )
+    }
+
+    if (existingReport.user_id && existingReport.status !== nextStatus) {
+      const { error: notificationError } = await supabaseAdmin
+        .from('notifications')
+        .insert([
+          {
+            user_id: existingReport.user_id,
+            title: 'Status laporan diperbarui',
+            message: `Laporan "${existingReport.title}" berubah status menjadi ${getStatusLabel(nextStatus)}.`,
+            is_read: false,
+          },
+        ])
+
+      if (notificationError) {
+        console.error('CREATE NOTIFICATION ERROR:', notificationError.message)
+      }
     }
 
     return NextResponse.json({
