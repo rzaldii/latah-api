@@ -61,6 +61,104 @@ export async function GET(
   })
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await request.json()
+
+    const nextStatus = body.status || body.new_status
+
+    const allowedStatuses = [
+      'pending',
+      'verified',
+      'processing',
+      'resolved',
+      'rejected',
+    ]
+
+    if (!nextStatus || !allowedStatuses.includes(nextStatus)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid report status',
+        },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('reports')
+      .update({
+        status: nextStatus,
+      })
+      .eq('id', id)
+      .is('deleted_at', null)
+      .select(`
+        *,
+        
+        users (
+          id,
+          name,
+          email
+        ),
+
+        report_categories (
+          id,
+          name,
+          icon
+        ),
+
+        report_images (
+          id,
+          image_url
+        ),
+
+        comments (
+          id,
+          comment,
+          created_at,
+          users (
+            id,
+            name
+          )
+        ),
+
+        votes (
+          id,
+          vote_type
+        )
+      `)
+      .single()
+
+    if (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message,
+        },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Report status updated successfully',
+      data,
+    })
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || 'Failed to update report status',
+      },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
