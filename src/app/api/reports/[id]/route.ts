@@ -189,7 +189,6 @@ export async function PATCH(
           title: 'Status laporan diperbarui',
           message: `Laporan "${existingReport.title}" berubah status menjadi ${getStatusLabel(nextStatus)}.`,
           is_read: false,
-          created_at: new Date().toISOString(),
         },
       ])
 
